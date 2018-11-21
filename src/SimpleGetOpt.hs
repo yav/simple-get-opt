@@ -48,10 +48,12 @@ Here is what the usage information looks like:
 module SimpleGetOpt
   ( -- * Basic functionality
     getOpts
+  , getOptsX
   , OptSpec(..)
   , OptDescr(..)
   , OptSetter
   , ArgDescr(..)
+  , GetOptException(..)
 
   -- * Information and error reporting.
   , dumpUsage
@@ -65,6 +67,7 @@ import System.Exit(exitFailure)
 import System.Environment(getArgs)
 
 import Control.Monad(unless)
+import Control.Exception(Exception,throwIO,catch)
 
 
 
@@ -140,18 +143,28 @@ addFile add (a,es) file = case add file a of
 
 -- | Get the command-line options and process them according to the given spec.
 -- The options will be permuted to get flags.
-getOpts :: OptSpec a -> IO a
-getOpts os =
+-- Throws a 'GetOptException' if some problems are found.
+getOptsX :: OptSpec a -> IO a
+getOptsX os =
   do as <- getArgs
      let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (opts os) as
-     unless (null errs) $ reportUsageError os errs
+     unless (null errs) $ throwIO (GetOptException errs)
      let (a, errs1) = foldl addOpt (progDefaults os,[]) funs
-     unless (null errs1) $ reportUsageError os errs1
+     unless (null errs1) $ throwIO (GetOptException errs1)
      let (b, errs2) = foldl (addFile (progParams os)) (a,[]) files
-     unless (null errs2) $ reportUsageError os errs2
+     unless (null errs2) $ throwIO (GetOptException errs2)
      return b
 
--- | Print the given messages on 'stderr' and show the program's usage info.
+
+-- | Get the command-line options and process them according to the given spec.
+-- The options will be permuted to get flags.
+-- On failure, print an error message on standard error and exit.
+getOpts :: OptSpec a -> IO a
+getOpts os =
+  getOptsX os `catch` \(GetOptException errs) -> reportUsageError os errs
+
+-- | Print the given messages on 'stderr' and show the program's usage info,
+-- then exit.
 reportUsageError :: OptSpec a -> [String] -> IO b
 reportUsageError os es =
   do hPutStrLn stderr "Invalid command line options:"
@@ -173,6 +186,10 @@ usageString os = GetOpt.usageInfo (params ++ "Flags:") (opts os)
              ps -> "Parameters:\n" ++ ps ++ "\n"
 
   ppParam (x,y) = "  " ++ x ++ "    " ++ y ++ "\n"
+
+data GetOptException = GetOptException [String] deriving Show
+
+instance Exception GetOptException
 
 
 
