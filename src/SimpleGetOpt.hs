@@ -59,6 +59,9 @@ module SimpleGetOpt
   , dumpUsage
   , reportUsageError
   , usageString
+
+  -- * Direct interaction with GetOpt
+  , specToGetOpt
   ) where
 
 import qualified System.Console.GetOpt as GetOpt
@@ -115,8 +118,8 @@ data ArgDescr a =
     -- The string describes the type of the argument.
 
 
-opts :: OptSpec a -> [ GetOpt.OptDescr (OptSetter a) ]
-opts = map convertOpt . progOptions
+specToGetOpt :: OptSpec a -> [ GetOpt.OptDescr (OptSetter a) ]
+specToGetOpt = map convertOpt . progOptions
 
 convertArg :: ArgDescr a -> GetOpt.ArgDescr (OptSetter a)
 convertArg arg =
@@ -147,7 +150,7 @@ addFile add (a,es) file = case add file a of
 getOptsX :: OptSpec a -> IO a
 getOptsX os =
   do as <- getArgs
-     let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (opts os) as
+     let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (specToGetOpt os) as
      unless (null errs) $ throwIO (GetOptException errs)
      let (a, errs1) = foldl addOpt (progDefaults os,[]) funs
      unless (null errs1) $ throwIO (GetOptException errs1)
@@ -179,7 +182,7 @@ dumpUsage os = hPutStrLn stderr (usageString os)
 
 -- | A string descibing the options.
 usageString :: OptSpec a -> String
-usageString os = GetOpt.usageInfo (params ++ "Flags:") (opts os)
+usageString os = GetOpt.usageInfo (params ++ "Flags:") (specToGetOpt os)
   where
   params = case concatMap ppParam (progParamDocs os) of
              "" -> ""
