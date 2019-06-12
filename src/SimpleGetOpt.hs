@@ -49,6 +49,7 @@ module SimpleGetOpt
   ( -- * Basic functionality
     getOpts
   , getOptsX
+  , getOptsFrom
   , OptSpec(..)
   , OptDescr(..)
   , OptSetter
@@ -144,20 +145,30 @@ addFile add (a,es) file = case add file a of
                             Right a1  -> (a1,es)
 
 
+-- | Process the given command line options according to the given spec.
+-- The options will be permuted to get flags.
+-- Returns errors on the 'Left'.
+getOptsFrom :: OptSpec a -> [String] -> Either GetOptException a
+getOptsFrom os as =
+  do let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (specToGetOpt os) as
+     unless (null errs) $ Left (GetOptException errs)
+     let (a, errs1) = foldl addOpt (progDefaults os,[]) funs
+     unless (null errs1) $ Left (GetOptException errs1)
+     let (b, errs2) = foldl (addFile (progParams os)) (a,[]) files
+     unless (null errs2) $ Left (GetOptException errs2)
+     pure b
+
+
+
 -- | Get the command-line options and process them according to the given spec.
 -- The options will be permuted to get flags.
 -- Throws a 'GetOptException' if some problems are found.
 getOptsX :: OptSpec a -> IO a
 getOptsX os =
   do as <- getArgs
-     let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (specToGetOpt os) as
-     unless (null errs) $ throwIO (GetOptException errs)
-     let (a, errs1) = foldl addOpt (progDefaults os,[]) funs
-     unless (null errs1) $ throwIO (GetOptException errs1)
-     let (b, errs2) = foldl (addFile (progParams os)) (a,[]) files
-     unless (null errs2) $ throwIO (GetOptException errs2)
-     return b
-
+     case getOptsFrom os as of
+       Left e -> throwIO e
+       Right a -> pure a
 
 -- | Get the command-line options and process them according to the given spec.
 -- The options will be permuted to get flags.
