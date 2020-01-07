@@ -111,11 +111,11 @@ data ArgDescr a =
     -- ^ This option does not take an argument.
 
   | ReqArg String (String -> OptSetter a)
-    -- ^ This optoin has a required arugment.
+    -- ^ This option has a required argument.
     -- The string describes the type of the argument.
 
   | OptArg String (Maybe String -> OptSetter a)
-    -- ^ This optoin has an optional arugment.
+    -- ^ This option has an optional argument.
     -- The string describes the type of the argument.
 
 
