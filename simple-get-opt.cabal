@@ -1,5 +1,5 @@
 name:                simple-get-opt
-version:             0.3
+version:             0.4
 synopsis:            A simple library for processing command-line options.
 description:
   A simple library for processing command-line options.
