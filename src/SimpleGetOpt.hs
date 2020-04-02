@@ -88,8 +88,9 @@ data OptSpec a = OptSpec
     -- ^ Documentatio for the free-form parameters.
 
   , progParams      :: String -> OptSetter a
-    -- ^ Add a parameter that is not an option or a flag
-    -- (i.e., this is just a free form command line parameter).
+    -- ^ Used to add the parameters that are not an option or a flag
+    -- (i.e., this is just a free form command line parameter)
+    -- in left-to-right order.
 
   }
 
