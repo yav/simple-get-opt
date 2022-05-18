@@ -9,11 +9,8 @@ Here is an example of a typical usage:
 >   }
 >
 > options :: OptSpec Settings
-> options = OptSpec
->   { progDefaults = Settings { verbose = False
->                             , inPar   = 1
->                             , files   = []
->                             }
+> options = optSpec
+>   { progDescription = [ "A useful utility." ]
 >
 >   , progOptions =
 >       [ Option ['v'] ["verbose"]
@@ -32,17 +29,22 @@ Here is an example of a typical usage:
 >       [ ("FILES",   "The files that need processing.") ]
 >
 >   , progParams = \p s -> Right s { files = p : files s }
+>
+>   , progArgOrder = Permute
 >   }
 
 Here is what the usage information looks like:
 
-> *Main> dumpUsage options 
+> *Main> dumpUsage options
+> A useful utility.
+> 
 > Parameters:
 >   FILES    The files that need processing.
->
+> 
 > Flags:
 >   -v      --verbose  Display more information while working.
 >   -p NUM  --par=NUM  Process that many files at once.
+
 -}
 
 module SimpleGetOpt
@@ -55,6 +57,8 @@ module SimpleGetOpt
   , OptSetter
   , ArgDescr(..)
   , GetOptException(..)
+  , GetOpt.ArgOrder(..)
+  , optSpec
 
   -- * Information and error reporting.
   , dumpUsage
@@ -77,22 +81,35 @@ import Control.Exception(Exception,throwIO,catch)
 
 -- | Specification of a collection of options, described by type @a@.
 data OptSpec a = OptSpec
-  { progDefaults :: a
-    -- ^ Default options.
-    -- This is what is used if no other options are provided.
+  { progDescription :: [String]
+    -- ^ Free form lines to be shown with the generated help
 
   , progOptions  :: [OptDescr a]
     -- ^ A list of options and command-line flags.
 
   , progParamDocs       :: [(String,String)]
-    -- ^ Documentatio for the free-form parameters.
+    -- ^ Documentation for the free-form parameters.
 
   , progParams      :: String -> OptSetter a
     -- ^ Used to add the parameters that are not an option or a flag
     -- (i.e., this is just a free form command line parameter)
     -- in left-to-right order.
 
+  , progArgOrder :: !(GetOpt.ArgOrder (OptSetter a))
+    -- ^ What to do with parameters
   }
+
+-- | A default empty specification.  The default argument order is 'Permute'.
+optSpec :: OptSpec a
+optSpec = OptSpec
+  { progDescription = []
+  , progOptions     = []
+  , progParamDocs   = []
+  , progParams      = \_ _ -> Left "Unexpected parameter"
+  , progArgOrder    = GetOpt.Permute
+  }
+
+
 
 -- | Describe an option.
 data OptDescr a = Option
@@ -149,11 +166,11 @@ addFile add (a,es) file = case add file a of
 -- | Process the given command line options according to the given spec.
 -- The options will be permuted to get flags.
 -- Returns errors on the 'Left'.
-getOptsFrom :: OptSpec a -> [String] -> Either GetOptException a
-getOptsFrom os as =
-  do let (funs,files,errs) = GetOpt.getOpt GetOpt.Permute (specToGetOpt os) as
+getOptsFrom :: a -> OptSpec a -> [String] -> Either GetOptException a
+getOptsFrom dflt os as =
+  do let (funs,files,errs) = GetOpt.getOpt (progArgOrder os) (specToGetOpt os) as
      unless (null errs) $ Left (GetOptException errs)
-     let (a, errs1) = foldl addOpt (progDefaults os,[]) funs
+     let (a, errs1) = foldl addOpt (dflt,[]) funs
      unless (null errs1) $ Left (GetOptException errs1)
      let (b, errs2) = foldl (addFile (progParams os)) (a,[]) files
      unless (null errs2) $ Left (GetOptException errs2)
@@ -164,19 +181,19 @@ getOptsFrom os as =
 -- | Get the command-line options and process them according to the given spec.
 -- The options will be permuted to get flags.
 -- Throws a 'GetOptException' if some problems are found.
-getOptsX :: OptSpec a -> IO a
-getOptsX os =
+getOptsX :: a -> OptSpec a -> IO a
+getOptsX dflt os =
   do as <- getArgs
-     case getOptsFrom os as of
+     case getOptsFrom dflt os as of
        Left e -> throwIO e
        Right a -> pure a
 
 -- | Get the command-line options and process them according to the given spec.
 -- The options will be permuted to get flags.
 -- On failure, print an error message on standard error and exit.
-getOpts :: OptSpec a -> IO a
-getOpts os =
-  getOptsX os `catch` \(GetOptException errs) -> reportUsageError os errs
+getOpts :: a -> OptSpec a -> IO a
+getOpts dlft os =
+  getOptsX dlft os `catch` \(GetOptException errs) -> reportUsageError os errs
 
 -- | Print the given messages on 'stderr' and show the program's usage info,
 -- then exit.
@@ -194,13 +211,20 @@ dumpUsage os = hPutStrLn stderr (usageString os)
 
 -- | A string descibing the options.
 usageString :: OptSpec a -> String
-usageString os = GetOpt.usageInfo (params ++ "Flags:") (specToGetOpt os)
+usageString os = GetOpt.usageInfo (desc ++ params ++ "Flags:") (specToGetOpt os)
   where
+  desc = case progDescription os of
+           [] -> []
+           xs -> unlines xs ++ "\n"
+
   params = case concatMap ppParam (progParamDocs os) of
              "" -> ""
              ps -> "Parameters:\n" ++ ps ++ "\n"
 
-  ppParam (x,y) = "  " ++ x ++ "    " ++ y ++ "\n"
+  ppParam (x,y) = "  " ++ padKey x ++ " " ++ y ++ "\n"
+
+  keyWidth = maximum (0 : map (length . fst) (progParamDocs os))
+  padKey k = k ++ replicate (keyWidth - length k) ' '
 
 data GetOptException = GetOptException [String] deriving Show
 

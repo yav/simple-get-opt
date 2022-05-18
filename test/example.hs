@@ -9,11 +9,10 @@ data Settings = Settings
 
 
 options :: OptSpec Settings
-options = OptSpec
-  { progDefaults = Settings { verbose = False
-                            , inPar   = 1
-                            , files   = []
-                            }
+options = optSpec
+  { progDescription = [ "A useful utility." ]
+
+  , progArgOrder = Permute
 
   , progOptions =
       [ Option ['v'] ["verbose"]
