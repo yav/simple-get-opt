@@ -1,2 +1,11 @@
+0.5:
+  BREAKING CHANGES.  Functionality for writing nested command based specs
+  Add `progArgOrder` (defaults to Permute) to allow NOT permuting flags
+  Add `progDescription` which adds free form lines that can be added to
+  the genrated help.
+  Add a defualt empty `optSepc` for less breaking changes in the future
+
+0:4:
+  Expose a pure option parsing function
 0.3:
   Export function for converting options to GetOpt
